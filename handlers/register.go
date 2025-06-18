@@ -27,7 +27,7 @@ func Register(c *gin.Context) {
 
 	_, err = config.DB.Exec(
 		c.Request.Context(),
-		"INSERT INTO users (username, password) VALUES ($1, $2)",
+		"INSERT INTO users (username, password_hash) VALUES ($1, $2)",
 		req.Username,
 		string(hashedPassword),
 	)

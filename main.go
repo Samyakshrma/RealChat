@@ -18,6 +18,7 @@ func main() {
 
 	r := gin.Default()
 	r.POST("/login", handlers.Login)
+	r.POST("/register", handlers.Register)
 	r.GET("/chat", middleware.AuthMiddleware(), handlers.ChatHandler)
 
 	r.Run(":8080")
