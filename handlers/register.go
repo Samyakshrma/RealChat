@@ -33,7 +33,7 @@ func Register(c *gin.Context) {
 	)
 
 	if err != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "Username already taken or DB error"})
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 		return
 	}
 

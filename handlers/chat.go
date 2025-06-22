@@ -23,13 +23,22 @@ func ChatHandler(c *gin.Context) {
 
 	fmt.Printf("User %d connected to chat with user %s\n", userID, targetID)
 
-	conn, _ := upgrader.Upgrade(c.Writer, c.Request, nil)
-	pubsub := utils.Rdb.Subscribe(utils.Ctx, fmt.Sprintf("user:%s", targetID))
+	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		return // or log
+	}
+
+	pubsub := utils.Rdb.Subscribe(utils.Ctx, fmt.Sprintf("user:%d", userID))
 	defer pubsub.Close()
 
 	go func() {
 		for {
-			msgType, msg, _ := conn.ReadMessage()
+			msgType, msg, err := conn.ReadMessage()
+			if err != nil {
+				fmt.Println("Error reading message:", err)
+				return
+			}
+
 			if msgType == websocket.TextMessage {
 				var payload map[string]interface{}
 				json.Unmarshal(msg, &payload)
