@@ -18,7 +18,18 @@ var upgrader = websocket.Upgrader{
 }
 
 func ChatHandler(c *gin.Context) {
-	userID := c.GetInt("user_id")
+	userIDInterface, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: user_id not found in context"})
+		return
+	}
+
+	userID, ok := userIDInterface.(int)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: user_id is not an integer"})
+		return
+	}
+
 	targetID := c.Query("to")
 
 	fmt.Printf("User %d connected to chat with user %s\n", userID, targetID)
@@ -43,7 +54,7 @@ func ChatHandler(c *gin.Context) {
 				var payload map[string]interface{}
 				json.Unmarshal(msg, &payload)
 
-				// Save to DB (Use config.DB instead of utils.Db)
+				// Save to DB
 				query := `INSERT INTO messages (sender_id, receiver_id, content, created_at) VALUES ($1, $2, $3, $4)`
 				_, err := config.DB.Exec(utils.Ctx, query, userID, payload["to"], payload["content"], time.Now())
 				if err != nil {
