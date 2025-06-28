@@ -88,10 +88,11 @@ func GetGroupMessages(c *gin.Context) {
 	groupID := c.Param("id")
 
 	rows, err := config.DB.Query(utils.Ctx, `
-		SELECT sender_id, content, created_at
-		FROM messages
-		WHERE group_id = $1
-		ORDER BY created_at ASC
+		SELECT m.sender_id, u.username as sender_name, m.content, m.created_at
+		FROM messages m
+		JOIN users u ON m.sender_id = u.id
+		WHERE m.group_id = $1
+		ORDER BY m.created_at ASC
 	`, groupID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch messages"})
@@ -102,15 +103,16 @@ func GetGroupMessages(c *gin.Context) {
 	messages := []gin.H{}
 	for rows.Next() {
 		var senderID int
-		var content string
+		var senderName, content string
 		var createdAt time.Time
-		if err := rows.Scan(&senderID, &content, &createdAt); err != nil {
+		if err := rows.Scan(&senderID, &senderName, &content, &createdAt); err != nil {
 			continue
 		}
 		messages = append(messages, gin.H{
-			"sender_id":  senderID,
-			"content":    content,
-			"created_at": createdAt,
+			"sender_id":   senderID,
+			"sender_name": senderName,
+			"content":     content,
+			"created_at":  createdAt,
 		})
 	}
 	c.JSON(http.StatusOK, messages)

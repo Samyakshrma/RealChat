@@ -86,7 +86,16 @@ func ChatHandler(c *gin.Context) {
 						if memberID == userID {
 							continue // Don't echo back to sender
 						}
+						// Fetch sender's name from DB
+						var senderName string
+						err = config.DB.QueryRow(utils.Ctx, `SELECT username FROM users WHERE id = $1`, userID).Scan(&senderName)
+						if err != nil {
+							fmt.Println("Error fetching sender name:", err)
+							senderName = "Unknown"
+						}
+
 						payload["sender_id"] = userID
+						payload["sender_name"] = senderName
 						payload["created_at"] = createdAt.Format(time.RFC3339)
 
 						enhancedMsg, err := json.Marshal(payload)
@@ -109,10 +118,17 @@ func ChatHandler(c *gin.Context) {
 						fmt.Println("Error saving DM:", err)
 						continue
 					}
+					var senderName string
+					err = config.DB.QueryRow(utils.Ctx, `SELECT username FROM users WHERE id = $1`, userID).Scan(&senderName)
+					if err != nil {
+						fmt.Println("Error fetching sender name:", err)
+						senderName = "Unknown"
+					}
 
 					// Publish to receiver's channel
 					// Inject missing fields
 					payload["sender_id"] = userID
+					payload["sender_name"] = senderName
 					payload["created_at"] = createdAt.Format(time.RFC3339) // Send ISO string
 
 					// Marshal payload back to JSON
@@ -145,11 +161,12 @@ func GetDirectMessages(c *gin.Context) {
 	otherID := c.Param("id")
 
 	rows, err := config.DB.Query(utils.Ctx, `
-		SELECT sender_id, receiver_id, content, created_at
-		FROM messages
-		WHERE (sender_id = $1 AND receiver_id = $2)
-		   OR (sender_id = $2 AND receiver_id = $1)
-		ORDER BY created_at ASC
+		SELECT m.sender_id, m.receiver_id, m.content, m.created_at, u.username as sender_name
+		FROM messages m
+		JOIN users u ON m.sender_id = u.id
+		WHERE (m.sender_id = $1 AND m.receiver_id = $2)
+		   OR (m.sender_id = $2 AND m.receiver_id = $1)
+		ORDER BY m.created_at ASC
 	`, userID, otherID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch direct messages"})
@@ -160,13 +177,14 @@ func GetDirectMessages(c *gin.Context) {
 	messages := []gin.H{}
 	for rows.Next() {
 		var senderID, receiverID int
-		var content string
+		var content, senderName string
 		var createdAt time.Time
-		if err := rows.Scan(&senderID, &receiverID, &content, &createdAt); err != nil {
+		if err := rows.Scan(&senderID, &receiverID, &content, &createdAt, &senderName); err != nil {
 			continue
 		}
 		messages = append(messages, gin.H{
 			"sender_id":   senderID,
+			"sender_name": senderName,
 			"receiver_id": receiverID,
 			"content":     content,
 			"created_at":  createdAt,
