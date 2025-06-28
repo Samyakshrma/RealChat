@@ -86,7 +86,17 @@ func ChatHandler(c *gin.Context) {
 						if memberID == userID {
 							continue // Don't echo back to sender
 						}
-						utils.Rdb.Publish(utils.Ctx, fmt.Sprintf("user:%d", memberID), msg)
+						payload["sender_id"] = userID
+						payload["created_at"] = createdAt.Format(time.RFC3339)
+
+						enhancedMsg, err := json.Marshal(payload)
+						if err != nil {
+							fmt.Println("Error marshalling enhanced group message:", err)
+							continue
+						}
+
+						utils.Rdb.Publish(utils.Ctx, fmt.Sprintf("user:%d", memberID), enhancedMsg)
+
 					}
 				} else if toRaw, exists := payload["to"]; exists {
 					// 1-on-1 message
@@ -101,7 +111,18 @@ func ChatHandler(c *gin.Context) {
 					}
 
 					// Publish to receiver's channel
-					utils.Rdb.Publish(utils.Ctx, fmt.Sprintf("user:%d", receiverID), msg)
+					// Inject missing fields
+					payload["sender_id"] = userID
+					payload["created_at"] = createdAt.Format(time.RFC3339) // Send ISO string
+
+					// Marshal payload back to JSON
+					enhancedMsg, err := json.Marshal(payload)
+					if err != nil {
+						fmt.Println("Error marshalling enhanced message:", err)
+						return
+					}
+
+					utils.Rdb.Publish(utils.Ctx, fmt.Sprintf("user:%d", receiverID), enhancedMsg)
 
 				}
 			}
